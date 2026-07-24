@@ -1,0 +1,25 @@
+application:
+  bindAddress: :8445
+  production : false
+  debug      : false
+database:
+  address : portfolio-db:3306
+  name    : portfolio
+  username: admin
+  password: admin
+authentication:
+  authority   : https://algotiqa-server:8443/auth/realms/algotiqa
+  clientId    : algotiqa-backend
+  clientSecret: PUT_YOUR_KEY_HERE
+platform:
+  storage: https://storage-manager:8452/api/storage
+  data   : https://data-collector:8446/api/collector
+messaging:
+  address : rabbitmq:5672
+  username: admin
+  password: admin
+  journal:
+    directory      : journal
+    queueSize      : 1000
+    compactMessages: 1000
+    dbSpoolInterval: 2

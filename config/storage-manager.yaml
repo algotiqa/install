@@ -1,0 +1,17 @@
+application:
+  bindAddress: :8452
+  production : false
+  debug      : false
+authentication:
+  authority: https://algotiqa-server:8443/auth/realms/algotiqa
+messaging:
+  address : rabbitmq:5672
+  username: admin
+  password: admin
+  journal:
+    directory      : journal
+    queueSize      : 1000
+    compactMessages: 1000
+    dbSpoolInterval: 0
+storage:
+  folder: storage

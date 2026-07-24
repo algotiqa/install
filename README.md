@@ -1,2 +1,3 @@
-# install
-Scripts for a local standalone installation using Docker/Podman
+# Install
+
+Scripts for a local standalone installation using Docker/Podman.
