@@ -8,28 +8,25 @@ services:
 #===
 #==============================================================================
 
-  algotiqa-server:
+  algotiqa:
     container_name: ${NAME}-gateway
     image: ghcr.io/algotiqa/gateway:0.9.1
     restart: always
     volumes:
-      - ./config:/config
-      - ./gateway/log:/log
+      - ./algotiqa/config:/config
+      - ./algotiqa/log:/log
     ports:
-      - 8443:8443
+      - "8443:8443"
     depends_on:
-      - frontend
-      - inventory-server
-      - data-collector
-      - portflio-trader
+      - keycloak
 
 #==============================================================================
 #===
-#=== Frontend
+#=== Graphical User Interface
 #===
 #==============================================================================
 
-  frontend:
+  gui:
     container_name: ${NAME}-gui
     image: ghcr.io/algotiqa/gui:0.9.0
     restart: always
@@ -44,18 +41,18 @@ services:
 #===
 #==============================================================================
 
-  inventory-server:
-    container_name: ${NAME}-inventory-server
-    image: ghcr.io/algotiqa/inventory-server:0.9.2
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./inventory/journal:/journal
-      - ./inventory/log:/log
-    depends_on:
-      - inventory-db
-      - storage-manager
-      - system-adapter
+#  inventory-server:
+#    container_name: ${NAME}-inventory-server
+#    image: ghcr.io/algotiqa/inventory-server:0.9.2
+#    restart: always
+#    volumes:
+#      - ./inventory-server/config:/config
+#      - ./inventory-server/journal:/journal
+#      - ./inventory-server/log:/log
+#    depends_on:
+#      - inventory-db
+#      - storage-manager
+#      - system-adapter
 
 #==============================================================================
 
@@ -69,7 +66,7 @@ services:
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: inventory
     volumes:
-      - ./inventory/database:/var/lib/mysql
+      - ./inventory-server/database:/var/lib/mysql
 
 #==============================================================================
 #===
@@ -77,20 +74,20 @@ services:
 #===
 #==============================================================================
 
-  data-collector:
-    container_name: ${NAME}-data-collector
-    image: ghcr.io/algotiqa/data-collector:0.9.2
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./collector/journal:/journal
-      - ./collector/log:/log
-      - ./collector/staging:/staging
-    depends_on:
-      - collector-db
-      - collector-data
-      - storage-manager
-      - system-adapter
+#  data-collector:
+#    container_name: ${NAME}-data-collector
+#    image: ghcr.io/algotiqa/data-collector:0.9.2
+#    restart: always
+#    volumes:
+#      - ./data-collector/config:/config
+#      - ./data-collector/journal:/journal
+#      - ./data-collector/log:/log
+#      - ./data-collector/staging:/staging
+#    depends_on:
+#      - collector-db
+#      - collector-data
+#      - storage-manager
+#      - system-adapter
 
 #==============================================================================
 
@@ -104,7 +101,7 @@ services:
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: collector
     volumes:
-      - ./collector/database:/var/lib/mysql
+      - ./data-collector/database:/var/lib/mysql
 
 #==============================================================================
 
@@ -113,9 +110,11 @@ services:
     container_name: ${NAME}-collector-data
     restart: always
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: datastore
     volumes:
-      - ./collector/data:/var/lib/postgresql/data
+      - ./data-collector/data:/var/lib/postgresql/data
 
 #==============================================================================
 #===
@@ -123,18 +122,18 @@ services:
 #===
 #==============================================================================
 
-  portfolio-trader:
-    container_name: ${NAME}-portfolio-trader
-    image: ghcr.io/algotiqa/portfolio-trader:0.9.0
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./portfolio/journal:/journal
-      - ./portfolio/log:/log
-    depends_on:
-      - portfolio-db
-      - storage-manager
-      - system-adapter
+#  portfolio-trader:
+#    container_name: ${NAME}-portfolio-trader
+#    image: ghcr.io/algotiqa/portfolio-trader:0.9.0
+#    restart: always
+#    volumes:
+#      - ./portfolio-trader/config:/config
+#      - ./portfolio-trader/journal:/journal
+#      - ./portfolio-trader/log:/log
+#    depends_on:
+#      - portfolio-db
+#      - storage-manager
+#      - system-adapter
 
 #==============================================================================
 
@@ -148,7 +147,7 @@ services:
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: portfolio
     volumes:
-      - ./portfolio/database:/var/lib/mysql
+      - ./portfolio-trader/database:/var/lib/mysql
 
 #==============================================================================
 #===
@@ -156,17 +155,17 @@ services:
 #===
 #==============================================================================
 
-  system-adapter:
-    container_name: ${NAME}-system-adapter
-    image: ghcr.io/algotiqa/system-adapter:0.9.0
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./portfolio/journal:/journal
-      - ./portfolio/log:/log
-    depends_on:
-      - rabbitmq
-      - keycloak
+#  system-adapter:
+#    container_name: ${NAME}-system-adapter
+#    image: ghcr.io/algotiqa/system-adapter:0.9.0
+#    restart: always
+#    volumes:
+#      - ./system-adapter/config:/config
+#      - ./system-adapter/journal:/journal
+#      - ./system-adapter/log:/log
+#    depends_on:
+#      - rabbitmq
+#      - keycloak
 
 #==============================================================================
 #===
@@ -174,19 +173,19 @@ services:
 #===
 #==============================================================================
 
-  storage-manager:
-    container_name: ${NAME}-storage-manager
-    image: ghcr.io/algotiqa/storage-manager:0.9.1
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./storage/default:/default
-      - ./storage/journal:/journal
-      - ./storage/log:/log
-      - ./storage/storage:/storage
-    depends_on:
-      - rabbitmq
-      - keycloak
+#  storage-manager:
+#    container_name: ${NAME}-storage-manager
+#    image: ghcr.io/algotiqa/storage-manager:0.9.1
+#    restart: always
+#    volumes:
+#      - ./storage-manager/config:/config
+#      - ./storage-manager/default:/default
+#      - ./storage-manager/journal:/journal
+#      - ./storage-manager/log:/log
+#      - ./storage-manager/storage:/storage
+#    depends_on:
+#      - rabbitmq
+#      - keycloak
 
 #==============================================================================
 #===
@@ -194,18 +193,18 @@ services:
 #===
 #==============================================================================
 
-  event-store:
-    container_name: ${NAME}-event-store
-    image: ghcr.io/algotiqa/event-store:0.9.0
-    restart: always
-    volumes:
-      - ./config:/config
-      - ./event/journal:/journal
-      - ./event/log:/log
-    depends_on:
-      - event-db
-      - rabbitmq
-      - keycloak
+#  event-store:
+#    container_name: ${NAME}-event-store
+#    image: ghcr.io/algotiqa/event-store:0.9.0
+#    restart: always
+#    volumes:
+#      - ./event-store/config:/config
+#      - ./event-store/journal:/journal
+#      - ./event-store/log:/log
+#    depends_on:
+#      - event-db
+#      - rabbitmq
+#      - keycloak
 
 #==============================================================================
 
@@ -219,7 +218,7 @@ services:
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: event
     volumes:
-      - ./event/database:/var/lib/mysql
+      - ./event-store/database:/var/lib/mysql
 
 #==============================================================================
 #===
@@ -228,7 +227,7 @@ services:
 #==============================================================================
 
   keycloak:
-    container_name: ${NAME}-keycloak-be
+    container_name: ${NAME}-keycloak
     image: quay.io/keycloak/keycloak:24.0.5
     restart: always
     command:
@@ -239,14 +238,16 @@ services:
       - "--hostname-admin-url=https://algotiqa-server:8443/auth"
       - "--proxy=reencrypt"
     volumes:
-      - ./config:/config
+      - ./keycloak/config:/config
     environment:
-      - KEYCLOAK_ADMIN=keycloak-admin
-      - KEYCLOAK_ADMIN_PASSWORD=key!cloak.2K
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
       - KC_DB=mysql
       - KC_DB_URL=jdbc:mysql://keycloak-db:3306/keycloak?serverTimezone=UTC
       - KC_DB_USERNAME=admin
-      - KC_DB_PASSWORD=password.123
+      - KC_DB_PASSWORD=admin
+    ports:
+      - "8448:8443"
     depends_on:
       - keycloak-db
 
@@ -259,10 +260,10 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_USER: admin
-      MYSQL_PASSWORD: password.123
+      MYSQL_PASSWORD: admin
       MYSQL_DATABASE: keycloak
     volumes:
-      - ./idp/database:/var/lib/mysql
+      - ./keycloak/database:/var/lib/mysql
 
 #==============================================================================
 #===
