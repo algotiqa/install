@@ -10,15 +10,16 @@ services:
 
   algotiqa:
     container_name: ${NAME}-gateway
-    image: ghcr.io/algotiqa/gateway:0.9.1
+    image: ghcr.io/algotiqa/gateway:0.9.2
     restart: always
     volumes:
-      - ./algotiqa/config:/config
-      - ./algotiqa/log:/log
+      - ./gateway/config:/config
+      - ./gateway/log:/log
     ports:
       - "8443:8443"
     depends_on:
-      - keycloak
+      keycloak:
+        condition: service_started
 
 #==============================================================================
 #===
@@ -28,12 +29,10 @@ services:
 
   gui:
     container_name: ${NAME}-gui
-    image: ghcr.io/algotiqa/gui:0.9.0
+    image: ghcr.io/algotiqa/gui:0.9.1
     restart: always
     volumes:
       - ./gui/log:/var/log/nginx
-    ports:
-      - 8444:80
 
 #==============================================================================
 #===
@@ -41,18 +40,36 @@ services:
 #===
 #==============================================================================
 
-#  inventory-server:
-#    container_name: ${NAME}-inventory-server
-#    image: ghcr.io/algotiqa/inventory-server:0.9.2
-#    restart: always
-#    volumes:
-#      - ./inventory-server/config:/config
-#      - ./inventory-server/journal:/journal
-#      - ./inventory-server/log:/log
-#    depends_on:
-#      - inventory-db
-#      - storage-manager
-#      - system-adapter
+  inventory-server:
+    container_name: ${NAME}-inventory-server
+    image: ghcr.io/algotiqa/inventory-server:0.9.2
+    restart: always
+    volumes:
+      - ./inventory-server/config:/config
+      - ./inventory-server/journal:/journal
+      - ./inventory-server/log:/log
+    depends_on:
+      inventory-db-migration:
+        condition: service_completed_successfully
+      storage-manager:
+        condition: service_started
+      system-adapter:
+        condition: service_started
+
+#==============================================================================
+
+  inventory-db-migration:
+    image: arigaio/atlas:latest
+    command: >
+      schema apply
+      -u "mysql://admin:admin@inventory-db:3306/inventory"
+      -to "file:///schema.sql"
+      --auto-approve
+    volumes:
+      - ./inventory-server/inventory-schema.sql:/schema.sql:ro
+    depends_on:
+      inventory-db:
+        condition: service_healthy
 
 #==============================================================================
 
@@ -67,6 +84,11 @@ services:
       MYSQL_DATABASE: inventory
     volumes:
       - ./inventory-server/database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 #==============================================================================
 #===
@@ -74,20 +96,39 @@ services:
 #===
 #==============================================================================
 
-#  data-collector:
-#    container_name: ${NAME}-data-collector
-#    image: ghcr.io/algotiqa/data-collector:0.9.2
-#    restart: always
-#    volumes:
-#      - ./data-collector/config:/config
-#      - ./data-collector/journal:/journal
-#      - ./data-collector/log:/log
-#      - ./data-collector/staging:/staging
-#    depends_on:
-#      - collector-db
-#      - collector-data
-#      - storage-manager
-#      - system-adapter
+  data-collector:
+    container_name: ${NAME}-data-collector
+    image: ghcr.io/algotiqa/data-collector:0.9.2
+    restart: always
+    volumes:
+      - ./data-collector/config:/config
+      - ./data-collector/journal:/journal
+      - ./data-collector/log:/log
+      - ./data-collector/staging:/staging
+    depends_on:
+      collector-db-migration:
+        condition: service_completed_successfully
+      collector-ds-migration:
+        condition: service_completed_successfully
+      storage-manager:
+        condition: service_started
+      system-adapter:
+        condition: service_started
+
+#==============================================================================
+
+  collector-db-migration:
+    image: arigaio/atlas:latest
+    command: >
+      schema apply
+      -u "mysql://admin:admin@collector-db:3306/collector"
+      -to "file:///schema.sql"
+      --auto-approve
+    volumes:
+      - ./data-collector/collector-db-schema.sql:/schema.sql:ro
+    depends_on:
+      collector-db:
+        condition: service_healthy
 
 #==============================================================================
 
@@ -102,6 +143,26 @@ services:
       MYSQL_DATABASE: collector
     volumes:
       - ./data-collector/database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+#==============================================================================
+
+  collector-ds-migration:
+    image: arigaio/atlas:latest
+    command: >
+      schema apply
+      -u "postgres://admin:admin@collector-data:5432/datastore"
+      -to "file:///schema.sql"
+      --auto-approve
+    volumes:
+      - ./data-collector/collector-ds-schema.sql:/schema.sql:ro
+    depends_on:
+      collector-db:
+        condition: service_healthy
 
 #==============================================================================
 
@@ -115,6 +176,11 @@ services:
       POSTGRES_DB: datastore
     volumes:
       - ./data-collector/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 #==============================================================================
 #===
@@ -122,20 +188,38 @@ services:
 #===
 #==============================================================================
 
-#  portfolio-trader:
-#    container_name: ${NAME}-portfolio-trader
-#    image: ghcr.io/algotiqa/portfolio-trader:0.9.0
-#    restart: always
-#    volumes:
-#      - ./portfolio-trader/config:/config
-#      - ./portfolio-trader/journal:/journal
-#      - ./portfolio-trader/log:/log
-#    depends_on:
-#      - portfolio-db
-#      - storage-manager
-#      - system-adapter
+  portfolio-trader:
+    container_name: ${NAME}-portfolio-trader
+    image: ghcr.io/algotiqa/portfolio-trader:0.9.0
+    restart: always
+    volumes:
+      - ./portfolio-trader/config:/config
+      - ./portfolio-trader/journal:/journal
+      - ./portfolio-trader/log:/log
+    depends_on:
+      portfolio-db-migration:
+        condition: service_completed_successfully
+      storage-manager:
+        condition: service_started
+      system-adapter:
+        condition: service_started
 
 #==============================================================================
+
+  portfolio-db-migration:
+    image: arigaio/atlas:latest
+    command: >
+      schema apply
+      -u "mysql://admin:admin@portfolio-db:3306/portfolio"
+      -to "file:///schema.sql"
+      --auto-approve
+    volumes:
+      - ./portfolio-trader/portfolio-schema.sql:/schema.sql:ro
+    depends_on:
+      portfolio-db:
+        condition: service_healthy
+
+  #==============================================================================
 
   portfolio-db:
     container_name: ${NAME}-portfolio-db
@@ -148,6 +232,11 @@ services:
       MYSQL_DATABASE: portfolio
     volumes:
       - ./portfolio-trader/database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 #==============================================================================
 #===
@@ -155,17 +244,19 @@ services:
 #===
 #==============================================================================
 
-#  system-adapter:
-#    container_name: ${NAME}-system-adapter
-#    image: ghcr.io/algotiqa/system-adapter:0.9.0
-#    restart: always
-#    volumes:
-#      - ./system-adapter/config:/config
-#      - ./system-adapter/journal:/journal
-#      - ./system-adapter/log:/log
-#    depends_on:
-#      - rabbitmq
-#      - keycloak
+  system-adapter:
+    container_name: ${NAME}-system-adapter
+    image: ghcr.io/algotiqa/system-adapter:0.9.0
+    restart: always
+    volumes:
+      - ./system-adapter/config:/config
+      - ./system-adapter/journal:/journal
+      - ./system-adapter/log:/log
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      keycloak:
+        condition: service_started
 
 #==============================================================================
 #===
@@ -173,19 +264,21 @@ services:
 #===
 #==============================================================================
 
-#  storage-manager:
-#    container_name: ${NAME}-storage-manager
-#    image: ghcr.io/algotiqa/storage-manager:0.9.1
-#    restart: always
-#    volumes:
-#      - ./storage-manager/config:/config
-#      - ./storage-manager/default:/default
-#      - ./storage-manager/journal:/journal
-#      - ./storage-manager/log:/log
-#      - ./storage-manager/storage:/storage
-#    depends_on:
-#      - rabbitmq
-#      - keycloak
+  storage-manager:
+    container_name: ${NAME}-storage-manager
+    image: ghcr.io/algotiqa/storage-manager:0.9.1
+    restart: always
+    volumes:
+      - ./storage-manager/config:/config
+      - ./storage-manager/default:/default
+      - ./storage-manager/journal:/journal
+      - ./storage-manager/log:/log
+      - ./storage-manager/storage:/storage
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      keycloak:
+        condition: service_started
 
 #==============================================================================
 #===
@@ -193,18 +286,38 @@ services:
 #===
 #==============================================================================
 
-#  event-store:
-#    container_name: ${NAME}-event-store
-#    image: ghcr.io/algotiqa/event-store:0.9.0
-#    restart: always
-#    volumes:
-#      - ./event-store/config:/config
-#      - ./event-store/journal:/journal
-#      - ./event-store/log:/log
-#    depends_on:
-#      - event-db
-#      - rabbitmq
-#      - keycloak
+  event-store:
+    container_name: ${NAME}-event-store
+    image: ghcr.io/algotiqa/event-store:0.9.1
+    restart: always
+    volumes:
+      - ./event-store/config:/app/config
+      - ./event-store/journal:/app/journal
+      - ./event-store/log:/app/log
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      event-db-migration:
+        condition: service_completed_successfully
+
+#==============================================================================
+
+  event-db-migration:
+    image: arigaio/atlas:latest
+    command: >
+      schema apply
+      -u "mysql://admin:admin@event-db:3306/event"
+      -to "file:///schema.sql"
+      --auto-approve
+    volumes:
+      - ./event-store/event-schema.sql:/schema.sql:ro
+    depends_on:
+      inventory-db:
+        condition: service_healthy
 
 #==============================================================================
 
@@ -219,6 +332,11 @@ services:
       MYSQL_DATABASE: event
     volumes:
       - ./event-store/database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 #==============================================================================
 #===
@@ -228,17 +346,19 @@ services:
 
   keycloak:
     container_name: ${NAME}-keycloak
-    image: quay.io/keycloak/keycloak:24.0.5
+    image: quay.io/keycloak/keycloak:26.7.1
     restart: always
     command:
       - "start"
       - "--https-certificate-file=/config/server.crt"
       - "--https-certificate-key-file=/config/server.key"
-      - "--hostname-url=https://algotiqa-server:8443/auth"
-      - "--hostname-admin-url=https://algotiqa-server:8443/auth"
-      - "--proxy=reencrypt"
+      - "--hostname=https://algotiqa:8443/auth"
+      - "--hostname-admin=https://algotiqa:8443/auth"
+      - "--proxy-headers=forwarded"
+      - "--import-realm"
     volumes:
       - ./keycloak/config:/config
+      - ./keycloak/import:/opt/keycloak/data/import
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
@@ -246,16 +366,15 @@ services:
       - KC_DB_URL=jdbc:mysql://keycloak-db:3306/keycloak?serverTimezone=UTC
       - KC_DB_USERNAME=admin
       - KC_DB_PASSWORD=admin
-    ports:
-      - "8448:8443"
     depends_on:
-      - keycloak-db
+      keycloak-db:
+        condition: service_healthy
 
 #==============================================================================
 
   keycloak-db:
     container_name: ${NAME}-keycloak-db
-    image: mysql:5.7
+    image: mysql:9.7.2
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -264,6 +383,11 @@ services:
       MYSQL_DATABASE: keycloak
     volumes:
       - ./keycloak/database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 #==============================================================================
 #===
